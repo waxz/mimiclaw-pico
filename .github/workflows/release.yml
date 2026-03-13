@@ -18,8 +18,12 @@ jobs:
       - name: Install ESP-IDF
         uses: espressif/esp-idf-ci-action@v1
         with:
-          esp_idf_version: v5.4
+          esp_idf_version: v5.5
           target: esp32c3
+
+      - name: Prepare Secrets
+        run: |
+          cp main/mimi_secrets.h.example main/mimi_secrets.h
 
       - name: Build with ESP-IDF
         run: |
