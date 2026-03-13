@@ -1,0 +1,4 @@
+# MimiClaw - Common Default Configuration
+
+# Network hostname
+CONFIG_LWIP_LOCAL_HOSTNAME="mimiclaw"
