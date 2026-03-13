@@ -30,17 +30,13 @@ jobs:
           idf.py set-target esp32c3
           idf.py build
           
-          # Use esptool.py to merge everything into one bin
-          # Locations: 
-          # - bootloader: 0x0
-          # - partition-table: 0x8000
-          # - app: 0x10000
-          # We search for their paths in the build directory
+          # Use esptool.py to merge everything into one bin based on flash_args
+          # This ensures correct offsets for bootloader, partition table, otadata, and app.
+          cd build
           esptool.py --chip esp32c3 merge_bin \
-            -o build/mimiclaw_merged_c3.bin \
-            0x0 build/bootloader/bootloader.bin \
-            0x8000 build/partition_table/partition-table.bin \
-            0x10000 build/mimiclaw.bin
+            -o mimiclaw_merged_c3.bin \
+            --fill-flash-size 4MB \
+            @flash_args
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
