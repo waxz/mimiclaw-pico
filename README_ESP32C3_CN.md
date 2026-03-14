@@ -108,7 +108,7 @@ MimiClaw 是一个运行在 ESP32 上的个人 AI 助手。本项目已经针对
 ### 3. 聊天频道配置
 *   **`set_feishu_creds <APP_ID> <APP_SECRET>`**: 配置飞书机器人凭据。
 *   **`feishu_send <RECEIVE_ID> <TEXT>`**: 手动向飞书发送一条测试消息。
-*   **`set_tg_token <TOKEN>`**: 配置 Telegram Bot Token (国内连不上则无效)。
+*   **`set_tg_token <TOKEN>`**: 配置 Telegram Bot Token。
 
 ### 4. 搜索与代理
 *   **`set_search_key <KEY>`**: 设置 Brave Search API Key。

@@ -87,7 +87,7 @@ MimiClaw 是一个运行在 ESP32 上的个人 AI 助手。本项目已经针对
 
 ## 🛠️ 常见问题 (Troubleshooting)
 *   **ESP_ERR_NO_MEM**: 如果遇到内存报错，请检查 `mimi_config.h` 中的 `MIMI_AGENT_MAX_HISTORY` (建议设为 5) 和 `MIMI_LLM_STREAM_BUF_SIZE`。
-*   **获取时间失败**: 确保设备能正常访问 `baidu.com`。
+*   **获取时间失败**: 确保设备能正常访问互联网。
 *   **无法记住上下文**: 检查串口是否有 SPIFFS 挂载成功的日志，确保 `spiffs.bin` 已正确烧录。
 
 ---
@@ -111,7 +111,7 @@ MimiClaw 是一个运行在 ESP32 上的个人 AI 助手。本项目已经针对
 ### 3. 聊天频道配置
 *   **`set_feishu_creds <APP_ID> <APP_SECRET>`**: 配置飞书机器人凭据。
 *   **`feishu_send <RECEIVE_ID> <TEXT>`**: 手动向飞书发送一条测试消息。
-*   **`set_tg_token <TOKEN>`**: 配置 Telegram Bot Token (国内连不上则无效)。
+*   **`set_tg_token <TOKEN>`**: 配置 Telegram Bot Token。
 
 ### 4. 搜索与代理
 *   **`set_search_key <KEY>`**: 设置 Brave Search API Key。
