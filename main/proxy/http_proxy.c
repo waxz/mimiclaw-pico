@@ -137,6 +137,8 @@ static int open_connect_tunnel(const char *host, int port, int timeout_ms)
     char port_str[8];
     snprintf(port_str, sizeof(port_str), "%d", s_proxy_port);
 
+    // ESP_LOGE(TAG, "TCP connect to proxy %s:%d %s  ", s_proxy_host, s_proxy_port, s_proxy_type);
+
     if (getaddrinfo(s_proxy_host, port_str, &hints, &res) != 0 || !res) {
         ESP_LOGE(TAG, "DNS resolve failed for proxy %s", s_proxy_host);
         return -1;
@@ -291,8 +293,9 @@ proxy_conn_t *proxy_conn_open(const char *host, int port, int timeout_ms)
     esp_tls_set_conn_state(conn->tls, ESP_TLS_CONNECTING);
 
     esp_tls_cfg_t cfg = {
-        .skip_common_name = true,
+        .skip_common_name = false, //← ADD THIS
         .timeout_ms = timeout_ms,
+        .crt_bundle_attach = esp_crt_bundle_attach,   // ← ADD THIS
     };
 
     int ret = esp_tls_conn_new_sync(host, strlen(host), port, &cfg, conn->tls);

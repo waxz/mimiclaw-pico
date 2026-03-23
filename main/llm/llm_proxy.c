@@ -1,6 +1,7 @@
 #include "llm_proxy.h"
 #include "mimi_config.h"
 #include "proxy/http_proxy.h"
+#include "utils/url_parser.h"
 
 #include <string.h>
 #include <stdlib.h>
@@ -22,6 +23,8 @@ static char s_api_key[LLM_API_KEY_MAX_LEN] = {0};
 static char s_model[LLM_MODEL_MAX_LEN] = MIMI_LLM_DEFAULT_MODEL;
 static char s_provider[16] = MIMI_LLM_PROVIDER_DEFAULT;
 static char s_base_url[128] = {0};
+static url_data_t s_base_url_data = {0};
+
 
 static void llm_log_payload(const char *label, const char *payload)
 {
@@ -196,11 +199,13 @@ static const char *llm_api_url(void)
 
 static const char *llm_api_host(void)
 {
+    if (s_base_url[0]) return s_base_url_data.host;
     return provider_is_openai() ? "api.openai.com" : "api.anthropic.com";
 }
 
 static const char *llm_api_path(void)
 {
+    if (s_base_url[0]) return s_base_url_data.pathname;
     return provider_is_openai() ? "/v1/chat/completions" : "/v1/messages";
 }
 
@@ -247,6 +252,10 @@ esp_err_t llm_proxy_init(void)
         }
         nvs_close(nvs);
     }
+
+    parse_url_info(s_base_url,&s_base_url_data);
+    ESP_LOGI(TAG, "LLM proxy initialized (url: %s, protocol: %s, host: %s, port: %i, pathname: %s)", s_base_url, s_base_url_data.protocol, s_base_url_data.host, s_base_url_data.port, s_base_url_data.pathname);
+
 
     if (s_api_key[0]) {
         ESP_LOGI(TAG, "LLM proxy initialized (provider: %s, model: %s)", s_provider, s_model);
@@ -402,7 +411,13 @@ static esp_err_t llm_http_via_proxy(const char *post_data, resp_buf_t *rb, int *
 
 static esp_err_t llm_http_call(const char *post_data, resp_buf_t *rb, int *out_status)
 {
-    if (http_proxy_is_enabled()) {
+    bool is_lan = is_lan_ip(s_base_url_data.host);
+    bool use_proxy = http_proxy_is_enabled() && !is_lan;
+    
+    ESP_LOGI(TAG, "LLM HTTP: host=%s, is_lan=%d, use_proxy=%d (proxy_enabled=%d)",
+             s_base_url_data.host, is_lan, use_proxy, http_proxy_is_enabled());
+
+    if (use_proxy) {
         return llm_http_via_proxy(post_data, rb, out_status);
     } else {
         return llm_http_direct(post_data, rb, out_status);
@@ -866,5 +881,8 @@ esp_err_t llm_set_base_url(const char *url)
 
     safe_copy(s_base_url, sizeof(s_base_url), url);
     ESP_LOGI(TAG, "Base URL set to: %s", s_base_url);
+    parse_url_info(s_base_url,&s_base_url_data);
+    ESP_LOGI(TAG, "LLM proxy initialized (url: %s, protocol: %s, host: %s, port: %i, pathname: %s)", s_base_url, s_base_url_data.protocol, s_base_url_data.host, s_base_url_data.port, s_base_url_data.pathname);
+
     return ESP_OK;
 }

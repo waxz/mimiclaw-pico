@@ -22,6 +22,14 @@ MimiClaw is a person AI assistant running on ESP32. This port is specifically tu
    source ./export.sh
    ```
 
+or use platformio
+```bash
+uv pip install platformio pip esptool==4.8.0 serial pyserial
+echo "alias pio=platformio" | tee -a ~/.bashrc
+source ~/.bashrc
+```
+
+
 ## 📦 Build & Flash
 The project uses specialized config files for the C3.
 
@@ -46,6 +54,32 @@ The project uses specialized config files for the C3.
    ```bash
    python -m esptool --chip esp32c3 merge_bin -o mimiclaw_c3_merged.bin --flash_mode dio --flash_size 4MB 0x0 build/bootloader/bootloader.bin 0x8000 build/partition_table/partition-table.bin 0xf000 build/ota_data_initial.bin 0x20000 build/mimiclaw.bin 0x320000 build/spiffs.bin
    ```
+## Use platformio
+1. **Build**
+```
+pio run -e esp32pico
+pio run -e esp32pico -t buildfs
+#or 
+pio run -e esp32c3
+pio run -e esp32c3 -t buildfs
+
+```
+
+2. **Flash**
+```
+python ./scripts/flash_esp32.py -t esp32pico
+
+#or
+python ./scripts/flash_esp32.py -t esp32c3
+
+```
+
+3. **Monitor**
+```
+pio device monitor -b 115200
+```
+or use this web tool
+- https://github.com/waxz/web-serial
 
 ---
 

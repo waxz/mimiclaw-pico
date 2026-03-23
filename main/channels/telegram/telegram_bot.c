@@ -2,6 +2,7 @@
 #include "bus/message_bus.h"
 #include "mimi_config.h"
 #include "proxy/http_proxy.h"
+#include "utils/string.h"
 
 #include "cJSON.h"
 #include "esp_crt_bundle.h"
@@ -453,106 +454,74 @@ esp_err_t telegram_send_message(const char *chat_id, const char *text) {
     return ESP_ERR_INVALID_STATE;
   }
 
-  /* Split long messages at 4096-char boundary */
-  size_t text_len = strlen(text);
+  /* Step 1: Convert markdown tables → code blocks */
+  char *with_tables = convert_markdown_tables(text);
+  const char *phase1 = with_tables ? with_tables : text;
+
+  /* Step 2: Sanitize remaining markdown for Telegram */
+  char *sanitized = sanitize_telegram_markdown(phase1);
+  free(with_tables);
+
+  const char *send_text = sanitized ? sanitized : text;
+  size_t text_len = strlen(send_text);
+
+  /* Final UTF-8 cleanup */
+  if (sanitized) {
+    text_len = strip_invalid_utf8(sanitized, text_len);
+  }
+
   size_t offset = 0;
   int all_ok = 1;
 
   while (offset < text_len) {
-    size_t chunk = text_len - offset;
-    if (chunk > MIMI_TG_MAX_MSG_LEN) {
-      chunk = MIMI_TG_MAX_MSG_LEN;
-    }
+    size_t chunk = utf8_safe_chunk(send_text + offset,
+                                   text_len - offset,
+                                   MIMI_TG_MAX_MSG_LEN);
+    if (chunk == 0) break;
 
-    /* Build JSON body */
-    cJSON *body = cJSON_CreateObject();
-    cJSON_AddStringToObject(body, "chat_id", chat_id);
-
-    /* Create null-terminated chunk */
     char *segment = malloc(chunk + 1);
-    if (!segment) {
-      cJSON_Delete(body);
-      return ESP_ERR_NO_MEM;
-    }
-    memcpy(segment, text + offset, chunk);
+    if (!segment) { free(sanitized); return ESP_ERR_NO_MEM; }
+    memcpy(segment, send_text + offset, chunk);
     segment[chunk] = '\0';
 
+    /* Try Markdown first */
+    cJSON *body = cJSON_CreateObject();
+    cJSON_AddStringToObject(body, "chat_id", chat_id);
     cJSON_AddStringToObject(body, "text", segment);
     cJSON_AddStringToObject(body, "parse_mode", "Markdown");
-
     char *json_str = cJSON_PrintUnformatted(body);
     cJSON_Delete(body);
-    free(segment);
-
-    if (!json_str) {
-      all_ok = 0;
-      offset += chunk;
-      continue;
-    }
-
-    ESP_LOGI(TAG, "Sending telegram chunk to %s (%d bytes)", chat_id,
-             (int)chunk);
-    char *resp = tg_api_call("sendMessage", json_str);
-    free(json_str);
 
     int sent_ok = 0;
-    bool markdown_failed = false;
-    if (resp) {
-      const char *desc = NULL;
-      sent_ok = tg_response_is_ok(resp, &desc);
-      if (!sent_ok) {
-        markdown_failed = true;
-        ESP_LOGI(TAG, "Markdown rejected by Telegram for %s: %s", chat_id,
-                 desc ? desc : "unknown");
-      }
+    char *resp = NULL;
+    if (json_str) {
+      resp = tg_api_call("sendMessage", json_str);
+      free(json_str);
+      if (resp) sent_ok = tg_response_is_ok(resp, NULL);
     }
 
+    /* Fallback: plain text */
     if (!sent_ok) {
-      /* Retry without parse_mode */
+      free(resp); resp = NULL;
       cJSON *body2 = cJSON_CreateObject();
       cJSON_AddStringToObject(body2, "chat_id", chat_id);
-      char *seg2 = malloc(chunk + 1);
-      if (seg2) {
-        memcpy(seg2, text + offset, chunk);
-        seg2[chunk] = '\0';
-        cJSON_AddStringToObject(body2, "text", seg2);
-        free(seg2);
-      }
+      cJSON_AddStringToObject(body2, "text", segment);
       char *json2 = cJSON_PrintUnformatted(body2);
       cJSON_Delete(body2);
       if (json2) {
-        char *resp2 = tg_api_call("sendMessage", json2);
+        resp = tg_api_call("sendMessage", json2);
         free(json2);
-        if (resp2) {
-          const char *desc2 = NULL;
-          sent_ok = tg_response_is_ok(resp2, &desc2);
-          if (!sent_ok) {
-            ESP_LOGE(TAG, "Plain send failed: %s", desc2 ? desc2 : "unknown");
-            ESP_LOGE(TAG, "Telegram raw response: %.300s", resp2);
-          }
-          free(resp2);
-        } else {
-          ESP_LOGE(TAG, "Plain send failed: no HTTP response");
-        }
-      } else {
-        ESP_LOGE(TAG, "Plain send failed: no JSON body");
+        if (resp) sent_ok = tg_response_is_ok(resp, NULL);
       }
     }
 
-    if (!sent_ok) {
-      all_ok = 0;
-    } else {
-      if (markdown_failed) {
-        ESP_LOGI(TAG, "Plain-text fallback succeeded for %s", chat_id);
-      }
-      ESP_LOGI(TAG, "Telegram send success to %s (%d bytes)", chat_id,
-               (int)chunk);
-    }
-
+    if (!sent_ok) all_ok = 0;
     free(resp);
+    free(segment);
     offset += chunk;
   }
 
+  free(sanitized);
   return all_ok ? ESP_OK : ESP_FAIL;
 }
 

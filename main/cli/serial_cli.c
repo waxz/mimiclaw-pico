@@ -873,7 +873,7 @@ esp_err_t serial_cli_init(void)
     base_url_args.end = arg_end(1);
     esp_console_cmd_t base_url_cmd = {
         .command = "set_base_url",
-        .help = "Set custom LLM API Base URL (e.g. https://api.moonshot.cn/v1)",
+        .help = "Set custom LLM API Base URL (e.g. https://ollama.com/v1/chat/completions)",
         .func = &cmd_set_base_url,
         .argtable = &base_url_args,
     };
